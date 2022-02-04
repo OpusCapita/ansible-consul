@@ -1,12 +1,36 @@
 ---
 # File: asserts.yml - Asserts for this playbook
 
+- name: Define supported *nix distributions
+  set_fact:
+    _consul_nix_distros:
+      - 'RedHat'
+      - 'CentOS'
+      - 'OracleLinux'
+      - 'Fedora'
+      - 'Debian'
+      - 'FreeBSD'
+      - 'SmartOS'
+      - 'Ubuntu'
+      - 'Archlinux'
+      - 'Alpine'
+      - 'Amazon'
+      - 'Flatcar'
+      - 'VMware Photon OS'
+
 - name: Check distribution compatibility
   fail:
     msg: "{{ ansible_distribution }} is not currently supported by this role."
   when:
-    - ansible_distribution not in ['RedHat', 'CentOS', 'OracleLinux', 'Fedora', 'Debian', 'FreeBSD', 'SmartOS', 'Ubuntu', 'Archlinux', 'Alpine', 'Amazon']
+    - ansible_distribution not in _consul_nix_distros
     - ansible_os_family != 'Windows'
+
+- name: Check Photon version
+  fail:
+    msg: "{{ ansible_distribution_version }} is not a supported version."
+  when:
+    - ansible_distribution in ['VMware Photon OS']
+    - ansible_distribution_version is version_compare(4, '<')
 
 - name: Check CentOS, Red Hat or Oracle Linux version
   fail:
@@ -94,6 +118,8 @@
   register: is_unzip_installed
   ignore_errors: true
   delegate_to: 127.0.0.1
+  vars:
+    ansible_become: false
 
 - name: Install remotely if unzip is not installed on control host
   set_fact:

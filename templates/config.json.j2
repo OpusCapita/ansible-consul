@@ -91,9 +91,14 @@
     {% endif %}
     {% if consul_tls_enable | bool %}
     "ca_file": "{{ consul_tls_dir }}/{{ consul_tls_ca_crt | basename }}",
+    {% if auto_encrypt is not defined or (auto_encrypt is defined and not auto_encrypt.enabled | bool)
+        or (item.config_version != 'client') | bool %}
     "cert_file": "{{ consul_tls_dir }}/{{ consul_tls_server_crt | basename }}",
     "key_file": "{{ consul_tls_dir }}/{{ consul_tls_server_key | basename }}",
     "verify_incoming": {{ consul_tls_verify_incoming | bool | to_json }},
+    {% else %}
+    "verify_incoming": false, 
+    {% endif %}
     "verify_outgoing": {{ consul_tls_verify_outgoing | bool | to_json }},
     "verify_incoming_rpc": {{consul_tls_verify_incoming_rpc | bool| to_json }},
     "verify_incoming_https": {{consul_tls_verify_incoming_https | bool| to_json }},
@@ -103,6 +108,22 @@
     "tls_cipher_suites": "{{ consul_tls_cipher_suites}}",
     {% endif %}
     "tls_prefer_server_cipher_suites": {{ consul_tls_prefer_server_cipher_suites | bool | to_json }},
+    {% if auto_encrypt is defined %}
+    "auto_encrypt": {
+        {% if auto_encrypt.enabled | bool and (item.config_version != 'client') | bool %}
+        "allow_tls": true,
+        {% endif %}
+        {% if auto_encrypt.enabled | bool and (item.config_version == 'client') | bool %}
+        "tls": true,
+        {% endif %}
+        {% if auto_encrypt.dns_san is defined %}
+        "dns_san": {{ auto_encrypt.dns_san | list | to_json }},
+        {% endif %}
+        {% if auto_encrypt.ip_san is defined %}
+        "ip_san": {{ auto_encrypt.ip_san | list | to_json }},
+        {% endif %}
+    },
+    {% endif %}
     {% endif %}
 
     {## LAN Join ##}
@@ -125,7 +146,7 @@
     "server": {{ (item.config_version != 'client') | bool | to_json }},
 
     {## Enable Connect on Server ##}
-    {% if (item.config_version != 'client') and consul_connect_enabled %}
+    {% if consul_connect_enabled | bool %}
     "connect": {
         "enabled": true
     },
@@ -266,6 +287,11 @@
             "acl_default_policy": "{{ consul_acl_default_policy }}",
         {% endif %}
     {% endif %}
+    {% endif %}
+
+    {## Limits ##}
+    {% if consul_version is version_compare('0.9.3', '>=') and consul_limits | length > 0 %}
+    "limits": {{ consul_limits | default({})| to_json }},
     {% endif %}
 
     {## UI ##}

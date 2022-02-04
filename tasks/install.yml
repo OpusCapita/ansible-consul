@@ -3,10 +3,16 @@
 
 - name: Install OS packages
   package:
-    name: "{{ item }}"
+    name: "{{ consul_os_packages }}"
     state: present
+  tags: installation
+  when: not ansible_facts['os_family'] == "VMware Photon OS"
+
+- name: Install OS packages
+  command: "tdnf install -y {{ item }}"
   with_items: "{{ consul_os_packages }}"
   tags: installation
+  when: ansible_facts['os_family'] == "VMware Photon OS"
 
 - name: Read package checksum file
   stat:
@@ -96,7 +102,9 @@
   become: false
   vars:
     ansible_become: false
-  tags: installation
+  tags:
+    - installation
+    - skip_ansible_lint
   run_once: true
   delegate_to: 127.0.0.1
   ignore_errors: "{{ ansible_check_mode }}"

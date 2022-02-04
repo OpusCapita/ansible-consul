@@ -3,15 +3,15 @@
 
 - name: Install OS packages
   package:
-    name: "{{ item }}"
+    name: "{{ consul_os_packages }}"
     state: present
-  with_items: "{{ consul_os_packages }}"
   tags: installation
 
 - name: Validate remote Consul directory
   file:
     path: /tmp/consul
     state: directory
+    mode: 0700
 
 - name: Read Consul package checksum file
   stat:

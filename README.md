@@ -19,20 +19,39 @@ Many users have expressed that the Vagrant based environment makes getting a wor
 
 If you get some mileage from it in other ways, then all the better!
 
+## Role migration and installation
+This role was originally developed by Brian Shumate and was known on Ansible Galaxy as **brianshumate.consul**. Brian asked the community to be relieved of the maintenance burden, and therefore Bas Meijer transferred the role to **ansible-community** so that a team of volunteers can maintain it. At the moment there is no membership of ansible-community on https://galaxy.ansible.com and therefore to install this role into your project you should create a file `requirements.yml` in the subdirectory `roles/` of your project with this content:
+
+```
+---
+- src: https://github.com/ansible-community/ansible-consul.git
+  name: ansible-consul
+  scm: git
+  version: master
+```
+
+This repo has tagged releases that you can use to pin the version.
+
+Tower will install the role automatically, if you use the CLI to control ansible, then install it like:
+
+```
+ansible-galaxy install -p roles -r roles/requirements.yml
+```
+
 ## Requirements
 
 This role requires a FreeBSD, Debian, or Red Hat Enterprise Linux distribution or Windows Server 2012 R2.
 
 The role might work with other OS distributions and versions, but is known to function well with the following software versions:
 
-* Consul: 1.7.0
+* Consul: 1.8.7
 * Ansible: 2.8.2
 * Alpine Linux: 3.8
-* CentOS: 7
+* CentOS: 7, 8
 * Debian: 9
 * FreeBSD: 11
-* RHEL: 7
-* OracleLinux: 7
+* RHEL: 7, 8
+* OracleLinux: 7, 8
 * Ubuntu: 16.04
 * Windows: Server 2012 R2
 
@@ -56,14 +75,15 @@ The role uses variables defined in these 3 places:
 - `vars/*.yml` (primarily OS/distributions specific variables)
 - `defaults/main.yml` (everything else)
 
-> **NOTE**: The label for servers in the hosts inventory file must be `[consul_instances]` as shown in the example. The role will not properly function if the label name is anything other value.
+> :warning: **NOTE**: The role relies on the inventory host group for the consul servers to be defined as the variable `consul_group_name` and it will not function properly otherwise. Alternatively the consul servers can be placed in the default host group `[consul_instances]` in the inventory as shown in the examples below.
 
 Many role variables can also take their values from environment variables as well; those are noted in the description where appropriate.
 
 ### `consul_version`
 
 - Version to install
-- Default value: 1.7.0
+- Set value as `latest` for the latest available version of consul
+- Default value: 1.8.7
 
 ### `consul_architecture_map`
 
@@ -80,6 +100,11 @@ Many role variables can also take their values from environment variables as wel
 
 - Operating system name in lowercase representation
 - Default value: `{{ ansible_os_family | lower }}`
+
+### `consul_install_dependencies`
+
+- Install python and package dependencies required for the role functions.
+- Default value: true
 
 ### `consul_zip_url`
 
@@ -411,7 +436,7 @@ Notice that the dict object has to use precisely the names stated in the documen
 - Define a custom node name (should not include dots)
   See [node_name](https://www.consul.io/docs/agent/options.html#node_name)
   - The default value on Consul is the hostname of the server.
-- Default value: '' 
+- Default value: ''
 
 ### `consul_recursors`
 
@@ -454,7 +479,7 @@ Notice that the dict object has to use precisely the names stated in the documen
 
 - ACL authoritative datacenter name
   - Override with `CONSUL_ACL_DATACENTER` environment variable
-- Default value: dc1
+- Default value: `{{ consul_datacenter }}` (`dc1`)
 
 ### `consul_acl_down_policy`
 
@@ -517,17 +542,12 @@ Notice that the dict object has to use precisely the names stated in the documen
   - Override with `CONSUL_ACL_TLS_ENABLE` environment variable
 - Default value: false
 
-### `consul_src_def`
+### `consul_tls_copy_keys`
 
-- Default source directory for TLS files
-  - Override with `CONSUL_ACL_TLS_ENABLE` environment variable
-- Default value: `{{ role_path }}/files`
-
-### `consul_tls_src_files`
-
-- User-specified source directory for TLS files
-  - Override with `CONSUL_TLS_SRC_FILES` environment variable
-- Default value: `{{ role_path }}/files`
+- Enables or disables the management of the TLS files
+  - Disable it if you enable TLS (`consul_tls_enable`) but want to manage the
+    TLS files on your own
+- Default value: true
 
 ### `consul_tls_dir`
 
@@ -628,6 +648,22 @@ Notice that the dict object has to use precisely the names stated in the documen
   - Can be overridden with `CONSUL_TLS_PREFER_SERVER_CIPHER_SUITES` environment variable
 - Default value: false
 
+### `auto_encrypt`
+- [Auto encrypt](https://www.consul.io/docs/agent/options#auto_encrypt)
+- Default value:
+```yaml
+auto_encrypt:
+  enabled: false
+```
+- Example:
+
+```yaml
+auto_encrypt:
+  enabled: true
+  dns_san: ["consul.com"]
+  ip_san: ["127.0.0.1"]
+```
+
 ### `consul_install_remotely`
 
 - Whether to download the files for installation directly on the remote hosts
@@ -639,6 +675,12 @@ Notice that the dict object has to use precisely the names stated in the documen
 - Whether to [upgrade consul](https://www.consul.io/docs/upgrading.html) when a new version is specified
 - The role does not handle the orchestration of a rolling update of servers followed by client nodes
 - This option is not available for Windows, yet. (PR welcome)
+- Default value: false
+
+### `consul_install_from_repo`
+
+- Boolean, whether to install consul from repository as opposed to installing the binary directly.
+- Supported distros: Amazon Linux, CentOS, Debian, Fedora, Ubuntu, Red Hat.
 - Default value: false
 
 ### `consul_ui`
@@ -768,6 +810,12 @@ _Consul Enterprise Only (requires that CONSUL_ENTERPRISE is set to true)_
 
 - Override with `CONSUL_AUTOPILOT_UPGRADE_VERSION_TAG` environment variable
 - Default value: ''
+
+### `consul_debug`
+
+- Enables the generation of additional config files in the Consul config
+  directory for debug purpose
+- Default value: false
 
 #### Custom Configuration Section
 
@@ -946,6 +994,18 @@ packages with different package names.
 #### `leave_on_terminate`
 - [leave_on_terminate](https://www.consul.io/docs/agent/options.html#leave_on_terminate) If enabled, when the agent receives a TERM signal, it will send a Leave message to the rest of the cluster and gracefully leave. The default behavior for this feature varies based on whether or not the agent is running as a client or a server. On agents in client-mode, this defaults to true and for agents in server-mode, this defaults to false.
 
+### `consul_limit`
+
+- Consul node limits (key-value)
+- Supported in Consul version 0.9.3 or later
+- Default value: *{}*
+- Example:
+```yaml
+consul_limits:
+    http_max_conns_per_client: 250
+    rpc_max_conns_per_client: 150
+```
+
 ## Dependencies
 
 Ansible requires GNU tar and this role performs some local use of the unarchive module for efficiency, so ensure that your system has `gtar` and `unzip` installed and in the PATH. If you don't this role will install `unzip` on the remote machines to unarchive the ZIP files.
@@ -1093,7 +1153,7 @@ consul3.node.consul.  0 IN  A 10.1.42.230
 
 ### `consul_connect_enabled`
 
-- Enable Consul Connect feature on servers
+- Enable Consul Connect feature
 - Default value: false
 
 ### iptables DNS Forwarding Support

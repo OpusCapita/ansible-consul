@@ -7,7 +7,7 @@ is_virtualenv: "{{ lookup('env','VIRTUAL_ENV') | default('', true) }}"
 consul_install_dependencies: true
 
 ### Package
-consul_version: "{{ lookup('env','CONSUL_VERSION') | default('1.7.3', true) }}"
+consul_version: "{{ lookup('env','CONSUL_VERSION') | default('1.8.7', true) }}"
 consul_architecture_map:
   # this first entry seems redundant
   # (but it's required for reasons)
@@ -33,13 +33,14 @@ consul_checksum_file_url: "https://releases.hashicorp.com/consul/{{ consul_versi
 ### Install Method
 consul_install_remotely: false
 consul_install_upgrade: false
+consul_install_from_repo: false
 
 ### Paths
 consul_bin_path: "/usr/local/bin"
 consul_config_path: "/etc/consul"
-consul_configd_path: "{{ consul_config_path }}/consul.d"
+consul_configd_path: "/etc/consul.d"
 consul_bootstrap_state: "{{ consul_config_path }}/.consul_bootstrapped"
-consul_data_path: "/var/consul"
+consul_data_path: "/opt/consul"
 consul_log_path: "{{ lookup('env','CONSUL_LOG_PATH') | default('/var/log/consul', true) }}"
 consul_log_file: "{{ lookup('env','CONSUL_LOG_FILE') | default('consul.log', true) }}"
 consul_run_path: "/run/consul"
@@ -49,9 +50,10 @@ consul_binary: "{{ consul_bin_path }}/consul"
 consul_manage_user: true
 consul_user: "consul"
 consul_manage_group: true
-consul_group: "bin"
+consul_group: "consul"
 consul_systemd_restart_sec: 42
 consul_systemd_limit_nofile: 65536
+consul_systemd_unit_path: "/lib/systemd/system"
 
 ### Log user, group, facility
 syslog_user: "{{ lookup('env','SYSLOG_USER') | default('root', true) }}"
@@ -192,7 +194,6 @@ consul_disable_keyring_file: "{{ lookup('env','CONSUL_DISABLE_KEYRING_FILE') | d
 
 ## TLS
 consul_tls_enable: "{{ lookup('env','CONSUL_TLS_ENABLE') | default(false, true) }}"
-consul_tls_src_files: "{{ lookup('env','CONSUL_TLS_SRC_FILES') | default(role_path+'/files', true) }}"
 consul_tls_dir: "{{ lookup('env','CONSUL_TLS_DIR') | default('/etc/consul/ssl', true) }}"
 consul_tls_ca_crt: "{{ lookup('env','CONSUL_TLS_CA_CRT') | default('ca.crt', true) }}"
 consul_tls_server_crt: "{{ lookup('env','CONSUL_SERVER_CRT') | default('server.crt', true) }}"
@@ -207,6 +208,8 @@ consul_tls_files_remote_src: false
 consul_tls_min_version: "{{ lookup('env','CONSUL_TLS_MIN_VERSION') | default('tls12', true) }}"
 consul_tls_cipher_suites: ""
 consul_tls_prefer_server_cipher_suites: "{{ lookup('env','CONSUL_TLS_PREFER_SERVER_CIPHER_SUITES') | default('false', true) }}"
+auto_encrypt:
+  enabled: false
 
 ## DNS
 consul_delegate_datacenter_dns: "{{ lookup('env','CONSUL_DELEGATE_DATACENTER_DNS') | default(false, true) }}"
@@ -251,3 +254,6 @@ consul_services: []
 
 # enable Consul Connect
 consul_connect_enabled: false
+
+# system limits
+consul_limits: {}
