@@ -5,26 +5,35 @@
   when:
     - consul_install_dependencies | bool
   block:
+    - name: Check if running in a virtualenv (robust)
+      command: /opt/ansible/bin/python -c "import sys; print(hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))"
+      delegate_to: 127.0.0.1
+      register: virtualenv_check
+      changed_when: false
+      run_once: true
+
+    - name: Set is_virtualenv fact (robust)
+      set_fact:
+        is_virtualenv: "{{ virtualenv_check.stdout == 'True' }}"
+      run_once: true
+
+    - name: Install netaddr dependency on controlling host (virtualenv)
+      pip:
+        name: netaddr
+        virtualenv: /opt/ansible
+      delegate_to: 127.0.0.1
+      become: false
+      run_once: true
+      when: is_virtualenv | bool
+
     - name: Install netaddr dependency on controlling host (with --user)
       pip:
         name: netaddr
         extra_args: --user
       delegate_to: 127.0.0.1
       become: false
-      vars:
-        ansible_become: false
       run_once: true
-      when: not is_virtualenv or is_virtualenv == None
-
-    - name: Install netaddr dependency on controlling host (virtualenv)
-      pip:
-        name: netaddr
-      delegate_to: 127.0.0.1
-      become: false
-      vars:
-        ansible_become: false
-      run_once: true
-      when: is_virtualenv is defined
+      when: not (is_virtualenv | bool)
 
 - name: Include checks/asserts
   import_tasks: asserts.yml
